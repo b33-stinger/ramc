@@ -1,0 +1,15 @@
+[package]
+name = "ramc"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+serde_json = { git = "https://github.com/serde-rs/json.git" }
+clap = { git = "https://github.com/clap-rs/clap.git", features = ["derive"] }
+scraper = "0.23.1"
+reqwest = { git = "https://github.com/seanmonstar/reqwest.git", features = ["json"] }
+tokio = { version = "1", features = ["full"] }
+once_cell = { version = "1" }
+
+[profile.release]
+strip = "symbols"
