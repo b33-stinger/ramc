@@ -13,7 +13,10 @@ cargo run -- --help
 ```
 
 ### Start
-`./[file]`
+```
+mv target/release/ramc ./
+./ramc
+```
 
 
 ### Usage
