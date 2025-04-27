@@ -1,6 +1,6 @@
 [package]
 name = "ramc"
-version = "0.0.1"
+version = "1.0.1"
 edition = "2024"
 
 [dependencies]
@@ -10,6 +10,8 @@ scraper = "0.23.1"
 reqwest = { git = "https://github.com/seanmonstar/reqwest.git", features = ["json"] }
 tokio = { version = "1", features = ["full"] }
 once_cell = { version = "1" }
+text_io = "0.1.13"
 
 [profile.release]
-strip = "symbols"
+strip = true
+lto = true
