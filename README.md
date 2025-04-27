@@ -1,4 +1,4 @@
-### Rust Arch Mirror Checker v0.0.1
+### Rust Arch Mirror Checker v1.0.1
 #### Check Arch ISO mirrors
 
 #### Setup
