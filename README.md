@@ -1,4 +1,4 @@
-### Rust Arch Mirror Checker v1.0.1
+### Rust Arch Mirror Checker v1.0.2
 #### Check Arch ISO mirrors
 
 #### Setup
@@ -27,6 +27,9 @@ mv target/release/ramc ./
 -i, --include-country <INCLUDE_COUNTRY>   Exclude Country                         [default: None]
 -q, --quiet                               Don't log (stdout) data                 [default: false]
 -n, --no-log                              Don't log (file) data                   [default: false]
+-t, --timeout <TIMEOUT>                   Request Timeout                         [default: 30]
+-u, --user-agent <USER_AGENT>             User Agent                              [default: None]
+-s, --skip-ssl                            Disable SSL verification (For all)      [default: false]
 -h, --help                                Print help
 ```
 
@@ -35,9 +38,9 @@ mv target/release/ramc ./
 ##### https://github.com/b33-stinger/amc
 #### Comparison
 ```
-time ./amc.py -t 10 -n 10     time ./ramc
+time ./amc.py -t 10 -n 10     time ./ramc -t 10
 
-real    0m51.352s             real    0m10.748s   -3.21× (79.10% faster) +32.5% (compared to 0.0.1)
-user    0m2.207s              user    0m0.749s    -3.18× (66.10% faster) -7.7%  (compared to 0.0.1)
-sys     0m0.300s              sys     0m0.230s    -1.21× (23.30% faster) +6.9%  (compared to 0.0.1)
+real    0m51.352s             real    0m10.748s   -3.21× (79.10% faster) (Stats same)
+user    0m2.207s              user    0m0.749s    -3.18× (66.10% faster) (Stats same)
+sys     0m0.300s              sys     0m0.230s    -1.21× (23.30% faster) (Stats same)
 ```

@@ -18,16 +18,16 @@ struct Args {
     #[arg(short, long, help = "URL to get the Mirrors from", default_value_t = String::from("https://archlinux.org/download/"))]
     download_url: String,
 
-    #[arg(short, long, default_value_t = false, help = "ask for a custom download URL (stdin)")]
+    #[arg(short, long, default_value_t = false, help = "Ask for a custom download URL (stdin)")]
     ask_custom_url: bool,
 
     #[arg(short, long, default_value_t = -1, help = "Max Mirrors to check (-1 == all)")]
     max_check: isize,
 
-    #[arg(short, long, help = "log file name", default_value_t =  String::from("log.json"))]
+    #[arg(short, long, help = "Log file name", default_value_t =  String::from("log.json"))]
     log_file: String,
 
-    #[arg(short, long, help = "dump to log after each iteration", default_value_t = false)]
+    #[arg(short, long, help = "Dump to log after each iteration", default_value_t = false)]
     continous_log: bool,
 
     #[arg(short, long, help = "Exclude Country", default_value_t = String::from(""))]
@@ -41,6 +41,15 @@ struct Args {
 
     #[arg(short, long, help = "Don't log (file) data", default_value_t = false)]
     no_log: bool,
+
+    #[arg(short, long, help = "Request Timeout", default_value_t = 30)]
+    timeout: u64,
+
+    #[arg(short, long, help = "User Agent", default_value_t = String::from(""))]
+    user_agent: String,
+
+    #[arg(short, long, help = "Disable SSL verification (For all)", default_value_t = false)]
+    skip_ssl: bool,
 }
 /*
 DONE_MIRRORS[0].0 = Working     (amount)
@@ -139,7 +148,9 @@ async fn check_mirror(quiet: bool) -> u8 {
     let mirrors = MIRRORS.lock().unwrap();
 
     let client = Client::builder()
-        .timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(args.timeout))
+        .danger_accept_invalid_certs(args.skip_ssl)
+        .user_agent(args.user_agent)
         .build()
         .expect("Failed to build client");
 
