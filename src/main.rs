@@ -6,6 +6,7 @@ use serde_json::{Value, json};
 use clap::Parser;
 use reqwest::{Error, Client, StatusCode};
 use scraper::{Html, Selector, ElementRef};
+use tokio::sync::Semaphore;
 use std::sync::{Arc, Mutex};
 use std::io::{self, Write};
 use std::time::Duration;
@@ -21,7 +22,7 @@ struct Args {
     #[arg(short, long, default_value_t = false, help = "Ask for a custom download URL (stdin)")]
     ask_custom_url: bool,
 
-    #[arg(short, long, default_value_t = -1, help = "Max Mirrors to check (-1 == all)")]
+    #[arg(long, default_value_t = -1, help = "Max Mirrors to check (-1 == all)")]
     max_check: isize,
 
     #[arg(short, long, help = "Log file name", default_value_t =  String::from("log.json"))]
@@ -50,6 +51,9 @@ struct Args {
 
     #[arg(short, long, help = "Disable SSL verification (For all)", default_value_t = false)]
     skip_ssl: bool,
+
+    #[arg(short, long, help = "Maximum Threads to use (-1 == No Limit)", default_value_t = -1)]
+    max_threads: i16,
 }
 /*
 DONE_MIRRORS[0].0 = Working     (amount)
@@ -142,6 +146,7 @@ fn parse_mirrors(raw_html: String, max_check: isize, country_exclude: Vec<&str>,
 #[tokio::main(flavor = "multi_thread")]
 async fn check_mirror(quiet: bool) -> u8 {
     let args: Args = Args::parse();
+    let max_threads: i16 = args.max_threads;
     let continous_log: bool = args.continous_log;
     let no_log = args.no_log;
     let mut tasks = vec![];
@@ -156,24 +161,36 @@ async fn check_mirror(quiet: bool) -> u8 {
 
     let log_data = Arc::new(Mutex::new(LOG_DATA.lock().unwrap().clone()));
 
+    let semaphore = if max_threads > 0 {
+        Some(Arc::new(Semaphore::new(max_threads as usize)))
+    } else {
+        None
+    };
+
     for mirror_data in mirrors.iter() {
         let log_data = Arc::clone(&log_data);
         let url = mirror_data[0].clone();
         let domain = mirror_data[1].clone();
         let country = mirror_data[2].clone();
         let client = client.clone();
+        let semaphore = semaphore.clone();
 
         log_data.lock().unwrap().as_object_mut().unwrap().insert(
             url.clone(),
             json!({"domain": domain, "status": {}}),
         );
 
-
         tasks.push(tokio::spawn(async move {
+            let _permit = match &semaphore {
+                Some(sem) => Some(sem.acquire().await.unwrap()),
+                None => None,
+            };
+
             let response = client.get(&url).send().await;
             let mut done_mirrors = DONE_MIRRORS.lock().unwrap();
             let mut response_code = String::from("Error");
             let mut status_icon= "❌";
+
             match response {
                 Ok(response) => {
                     if response.status() == StatusCode::OK {
@@ -185,24 +202,26 @@ async fn check_mirror(quiet: bool) -> u8 {
                         log_data.lock().unwrap().as_object_mut().unwrap().get_mut(&url).unwrap()["status"] = json!(0);
                     }
                     response_code = response.status().as_u16().to_string();
-                    log_data.lock().unwrap().as_object_mut().unwrap().get_mut(&url).unwrap()["code"] = json!(response_code);// I'm no Rust dev but i know this is bad, feel free to contrib
-                    log_data.lock().unwrap().as_object_mut().unwrap().get_mut(&url).unwrap()["country"] = json!(country);   // I'm no Rust dev but i know this is bad, feel free to contrib
+                    log_data.lock().unwrap().as_object_mut().unwrap().get_mut(&url).unwrap()["code"] = json!(response_code);
+                    log_data.lock().unwrap().as_object_mut().unwrap().get_mut(&url).unwrap()["country"] = json!(country);
                 }
                 Err(_) => {
                     log_data.lock().unwrap().as_object_mut().unwrap().get_mut(&url).unwrap()["status"] = json!(0);
                     done_mirrors[0].1 += 1;
                 }
             }
-            let percent_suceed: f32 = (done_mirrors[0].0 as f32 / (done_mirrors[0].0 as f32 + done_mirrors[0].1 as f32)) * 100.0;
-            let total_percent: f32 = ((done_mirrors[0].0 as f32 + done_mirrors[0].1 as f32) / done_mirrors[0].2 as f32) * 100.0;
+
+            let percent_suceed: f32 = (done_mirrors[0].0 as f32 / (done_mirrors[0].0 + done_mirrors[0].1).max(1) as f32) * 100.0;
+            let total_percent: f32 = ((done_mirrors[0].0 + done_mirrors[0].1) as f32 / done_mirrors[0].2 as f32) * 100.0;
             let mirrors_left = done_mirrors[0].2 - (done_mirrors[0].0 + done_mirrors[0].1);
 
             if !quiet {
                 println!("{:<70} {:<30} {} ({})", url, country, status_icon, response_code);
                 print!("[\x1b[31m{}\x1b[0m / \x1b[32m{}\x1b[0m ({:.2}%) / {} / ({}) {:.2}%]\r", done_mirrors[0].1, done_mirrors[0].0, percent_suceed, done_mirrors[0].2, mirrors_left, total_percent);
             }
+
             io::stdout().flush().unwrap();
-            if continous_log && !no_log{
+            if continous_log && !no_log {
                 log(Some(log_data.lock().unwrap().clone()));
             }
         }));
@@ -211,9 +230,11 @@ async fn check_mirror(quiet: bool) -> u8 {
     for task in tasks {
         task.await.unwrap();
     }
-    if !no_log{
+
+    if !no_log {
         log(Some(log_data.lock().unwrap().clone()));
     }
+
     1
 }
 
